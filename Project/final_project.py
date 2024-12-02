@@ -15,6 +15,26 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trai
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
 from adapters import AdapterConfig
+from pathlib import Path
+
+
+# Define model directories
+BASE_MODEL_DIR = "./base_model"
+LORA_MODEL_DIR = "./lora_model"
+ADAPTER_MODEL_DIR = "./adapter_model"
+
+# Base directory names
+from datetime import datetime
+
+# timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+base_results_dir = f"./results/base" #_{timestamp}"
+lora_results_dir = f"./results/lora" #_{timestamp}"
+adapter_results_dir = f"./results/adapter" #_{timestamp}"
+
+# Ensure directories exist
+Path(base_results_dir).mkdir(parents=True, exist_ok=True)
+Path(lora_results_dir).mkdir(parents=True, exist_ok=True)
+Path(adapter_results_dir).mkdir(parents=True, exist_ok=True)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f'Using Device: {device}')
@@ -29,19 +49,65 @@ def print_trainable_params(model, stage_name="Model"):
         if param.requires_grad:
             print(f"  - {name}: {param.numel()} params")
 
+# # Prepare training arguments
+# training_args = TrainingArguments(
+#     output_dir="./results",
+#     evaluation_strategy="epoch",  # Evaluate periodically during training
+#     #eval_steps=100,               # Frequency of evaluation (adjust as needed)
+#     save_strategy="epoch",
+#     learning_rate=2e-5,
+#     per_device_train_batch_size=16,
+#     per_device_eval_batch_size=16,
+#     num_train_epochs=3,
+#     weight_decay=0.01,
+#     logging_dir="./logs",
+#     logging_steps=10,
+#     load_best_model_at_end=True,
+#     fp16=True,  # Enable mixed precision training for GPU
+#     report_to="none",  # Disable reporting to avoid unnecessary overhead
+# )
+
+# Base TrainingArguments configuration
+base_args = {
+    "evaluation_strategy": "epoch",
+    "save_strategy": "epoch",
+    "learning_rate": 2e-5,
+    "per_device_train_batch_size": 16,
+    "per_device_eval_batch_size": 16,
+    "num_train_epochs": 3,
+    "weight_decay": 0.01,
+    "logging_steps": 10,
+    "load_best_model_at_end": True,
+    "fp16": True,
+    "report_to": "none",
+}
+# To create dynamic result directory
+def create_training_args(output_dir):
+    return TrainingArguments(
+        output_dir=output_dir,
+        logging_dir=f"{output_dir}/logs",
+        **base_args,
+    )
+
 # Load Llama 1B and tokenizer
 model_name = "meta-llama/Llama-3.2-1B"  # Using LLama 1B as base model
 
 # Couldn't train Llama because of lower mem GPUs so shifting to roberta
 model_name = "FacebookAI/roberta-large"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-# Ensure tokenizer has a padding token
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token  # Use EOS token as PAD token
-base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-base_model.config.pad_token_id = base_model.config.eos_token_id
+
+# Step 1: Load or initialize tokenizer
+if os.path.exists(BASE_MODEL_DIR):
+    print("\nTokenizer already exists. Loading from base model directory...")
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_DIR)
+else:
+    print("\nInitializing tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    # Ensure tokenizer has a padding token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token  # Use EOS token as PAD token
 
 
+# Loading Dataset
 ds = load_dataset("stanfordnlp/imdb")
 
 def preprocess_function(examples):
@@ -60,52 +126,116 @@ test_dataset = tokenized_datasets["test"].shuffle(seed=42)    # Use full testing
 # train_data = ds['train']
 # val_data = ds['validation']
             
-            
-# Prepare training arguments
-training_args = TrainingArguments(
-    output_dir="./results",
-    evaluation_strategy="epoch",  # Evaluate periodically during training
-    #eval_steps=100,               # Frequency of evaluation (adjust as needed)
-    save_strategy="epoch",
-    learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=3,
-    weight_decay=0.01,
-    logging_dir="./logs",
-    logging_steps=10,
-    load_best_model_at_end=True,
-    fp16=True,  # Enable mixed precision training for GPU
-    report_to="none",  # Disable reporting to avoid unnecessary overhead
-)
 
-# Train base model
-trainer_base = Trainer(
-    model=base_model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=test_dataset,
-    tokenizer=tokenizer,
-)
-
-base_model.to(device)
-
-print_trainable_params(base_model, stage_name="Base Model")
-
-print("\nTraining Base Model...")
-# Resize model embeddings after adding new special tokens
-base_model.resize_token_embeddings(len(tokenizer))
-start_time = time.time()
-trainer_base.train()
-
-print(f"Time taken to train: {time.time()-start_time}s")
-# Save base model
-tokenizer.save_pretrained("./base_model")
-base_model.save_pretrained("./base_model")
+# Function to evaluate models
+def evaluate_model(model, training_args, name):
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+    print(f"\nEvaluating {name} Model...")
+    results = trainer.evaluate()
+    print(f"{name} Model Results:", results)
+    return results
 
 
 
-# Evaluate base model
-print("\nEvaluating Base Model...")
-base_results = trainer_base.evaluate()
-print("Base Model Results:", base_results)
+# Step 2: Train or load the base model
+base_training_args = create_training_args(base_results_dir)
+
+if os.path.exists(BASE_MODEL_DIR):
+    print("\nBase model already exists. Loading base model...")
+    base_model = AutoModelForSequenceClassification.from_pretrained(BASE_MODEL_DIR)
+else:
+    print("\nTraining Base Model...")
+    base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    base_model.config.pad_token_id = base_model.config.eos_token_id
+    trainer_base = Trainer(
+        model=base_model,
+        args=base_training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+    print_trainable_params(base_model, stage_name="Base Model")
+    base_model.to(device)
+    start_time = time.time()
+    trainer_base.train()
+    print(f"Base Model training time: {time.time() - start_time}s")
+    base_model.save_pretrained(BASE_MODEL_DIR)
+    tokenizer.save_pretrained(BASE_MODEL_DIR)
+    print("\nBase model training completed.")
+
+# Step 3: Train or load the LoRA model
+lora_training_args = create_training_args(lora_results_dir)
+if os.path.exists(LORA_MODEL_DIR):
+    print("\nLoRA model already exists. Loading LoRA model...")
+    lora_model = AutoModelForSequenceClassification.from_pretrained(LORA_MODEL_DIR)
+else:
+    print("\nTraining LoRA Model...")
+    # Define LoRA configuration
+    lora_config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        target_modules=["q_proj", "v_proj"],
+        lora_dropout=0.1,
+        bias="none",
+        task_type="SEQ_CLS", 
+        inference_mode=False,
+    )
+    # Apply LoRA to model
+    lora_model = get_peft_model(base_model, lora_config).to(device)
+    trainer_lora = Trainer(
+        model=lora_model,
+        args=lora_training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+    start_time = time.time()
+    trainer_lora.train()
+    print(f"LoRA model training time: {time.time() - start_time}s")
+    lora_model.save_pretrained(LORA_MODEL_DIR)
+    tokenizer.save_pretrained(LORA_MODEL_DIR)
+    print("\nLoRA model training completed.")
+    
+    
+# Step 4: Train or load the Adapter model
+adapter_training_args = create_training_args(adapter_results_dir)
+if os.path.exists(ADAPTER_MODEL_DIR):
+    print("\nAdapter model already exists. Loading Adapter model...")
+    adapter_model = AutoModelForSequenceClassification.from_pretrained(ADAPTER_MODEL_DIR)
+else:
+    print("\nTraining Adapter Model...")
+    adapter_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    adapter_config = AdapterConfig(mh_adapter=True, output_adapter=True, reduction_factor=16, non_linearity="relu")
+    adapter_model.add_adapter("imdb_adapter", config=adapter_config)
+    adapter_model.train_adapter(["imdb_adapter"])
+    trainer_adapter = Trainer(
+        model=adapter_model,
+        args=adapter_training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+    start_time = time.time()
+    trainer_adapter.train()
+    print(f"Adapter model training time: {time.time() - start_time}s")
+    adapter_model.save_pretrained(ADAPTER_MODEL_DIR)
+    tokenizer.save_pretrained(ADAPTER_MODEL_DIR)
+    print("\nAdapter model training completed.")
+
+
+# Step 5: Evaluate all models
+print("\nEvaluating all models...")
+base_results = evaluate_model(base_model, base_training_args, "Base")
+lora_results = evaluate_model(lora_model, lora_training_args, "LoRA")
+adapter_results = evaluate_model(adapter_model, adapter_training_args, "Adapter")
+
+# Summary of results
+print("\nSummary of Results:")
+print("Base Model:", base_results)
+print("LoRA Model:", lora_results)
+print("Adapter Model:", adapter_results)
