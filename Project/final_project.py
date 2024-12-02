@@ -94,4 +94,12 @@ base_model.resize_token_embeddings(len(tokenizer))
 trainer_base.train()
 
 # Save base model
+tokenizer.save_pretrained("./base_model")
 base_model.save_pretrained("./base_model")
+
+
+
+# Evaluate base model
+print("\nEvaluating Base Model...")
+base_results = trainer_base.evaluate()
+print("Base Model Results:", base_results)
