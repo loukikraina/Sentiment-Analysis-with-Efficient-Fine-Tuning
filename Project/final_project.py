@@ -34,8 +34,9 @@ model_name = "meta-llama/Llama-3.2-1B"  # Using LLama 1B as base model
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 # Ensure tokenizer has a padding token
 if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({"pad_token": "[PAD]"})  # Use EOS token as PAD token
+    tokenizer.pad_token = tokenizer.eos_token # Use EOS token as PAD token
 base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+base_model.config.pad_token_id = base_model.config.eos_token_id
 
 
 ds = load_dataset("stanfordnlp/imdb")
@@ -60,9 +61,9 @@ test_dataset = tokenized_datasets["test"].shuffle(seed=42)    # Use full testing
 # Prepare training arguments
 training_args = TrainingArguments(
     output_dir="./results",
-    evaluation_strategy="steps",  # Evaluate periodically during training
-    eval_steps=100,               # Frequency of evaluation (adjust as needed)
-    save_strategy="epoch", save_strategy="epoch",
+    evaluation_strategy="epoch",  # Evaluate periodically during training
+    #eval_steps=100,               # Frequency of evaluation (adjust as needed)
+    save_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
