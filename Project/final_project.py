@@ -31,10 +31,13 @@ def print_trainable_params(model, stage_name="Model"):
 
 # Load Llama 1B and tokenizer
 model_name = "meta-llama/Llama-3.2-1B"  # Using LLama 1B as base model
+
+# Couldn't train Llama because of lower mem GPUs so shifting to roberta
+model_name = "FacebookAI/roberta-large"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 # Ensure tokenizer has a padding token
 if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token # Use EOS token as PAD token
+    tokenizer.pad_token = tokenizer.eos_token  # Use EOS token as PAD token
 base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
 base_model.config.pad_token_id = base_model.config.eos_token_id
 
@@ -92,8 +95,10 @@ print_trainable_params(base_model, stage_name="Base Model")
 print("\nTraining Base Model...")
 # Resize model embeddings after adding new special tokens
 base_model.resize_token_embeddings(len(tokenizer))
+start_time = time.time()
 trainer_base.train()
 
+print(f"Time taken to train: {time.time()-start_time}s")
 # Save base model
 tokenizer.save_pretrained("./base_model")
 base_model.save_pretrained("./base_model")
