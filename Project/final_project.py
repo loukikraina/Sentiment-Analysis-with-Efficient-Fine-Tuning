@@ -77,7 +77,7 @@ def create_training_args(output_dir, lr):
     return TrainingArguments(
         output_dir=output_dir,
         logging_dir=f"{output_dir}/logs",
-        learning_rate: lr,
+        learning_rate = lr,
         **base_args,
     )
 
