@@ -14,7 +14,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
-from adapters import AdapterConfig
+from adapters import AdapterConfig, BnConfig
 from pathlib import Path
 
 
@@ -69,7 +69,7 @@ def print_trainable_params(model, stage_name="Model"):
 
 # Base TrainingArguments configuration
 base_args = {
-    "evaluation_strategy": "epoch",
+    "eval_strategy": "epoch",
     "save_strategy": "epoch",
     "learning_rate": 2e-5,
     "per_device_train_batch_size": 16,
@@ -194,6 +194,7 @@ else:
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
     )
+    print_trainable_params(lora_model, stage_name="LoRA Model")
     start_time = time.time()
     trainer_lora.train()
     print(f"LoRA model training time: {time.time() - start_time}s")
@@ -210,7 +211,7 @@ if os.path.exists(ADAPTER_MODEL_DIR):
 else:
     print("\nTraining Adapter Model...")
     adapter_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-    adapter_config = AdapterConfig(mh_adapter=True, output_adapter=True, reduction_factor=16, non_linearity="relu")
+    adapter_config = BnConfig(mh_adapter=True, output_adapter=True, reduction_factor=16, non_linearity="relu")
     adapter_model.add_adapter("imdb_adapter", config=adapter_config)
     adapter_model.train_adapter(["imdb_adapter"])
     trainer_adapter = Trainer(
@@ -220,6 +221,7 @@ else:
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
     )
+    print_trainable_params(adapter_model, stage_name="Adapter Model")
     start_time = time.time()
     trainer_adapter.train()
     print(f"Adapter model training time: {time.time() - start_time}s")
