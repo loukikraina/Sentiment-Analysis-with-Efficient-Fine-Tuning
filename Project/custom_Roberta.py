@@ -15,6 +15,11 @@ class CustomRobertaLayer(RobertaLayer):
         self.up_layer = nn.Linear(config.hidden_size // 2, config.hidden_size)    # Up-projection
         self.activation = nn.ReLU()                                              # Activation function
         self.layer_norm = nn.LayerNorm(config.hidden_size)                       # LayerNorm after Up-projection
+        # intializing all as new layers
+        self.down_layer._is_new = True
+        self.up_layer._is_new = True
+        self.activation._is_new = True
+        self.layer_norm._is_new = True
 
     def forward(
         self,
@@ -79,6 +84,7 @@ class CustomRobertaModel(RobertaModel):
             nn.ReLU(),
             nn.Linear(1024, config.num_labels),
         )
+        self.classifier._is_new = True
 
         # Freeze existing layers if needed
         self.freeze_pretrained_layers()
@@ -132,7 +138,7 @@ class CustomRobertaModel(RobertaModel):
 
 # Initialize new weights
 def initialize_weights(module):
-    if isinstance(module, nn.Linear):
+    if isinstance(module, nn.Linear) and getattr(module, "_is_new", False):
         nn.init.xavier_uniform_(module.weight)
         if module.bias is not None:
             nn.init.zeros_(module.bias)

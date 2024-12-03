@@ -171,7 +171,7 @@ else:
     lora_config = LoraConfig(
         r=8,
         lora_alpha=16,
-        target_modules=["q_proj", "v_proj"],
+        #target_modules=["q_proj", "v_proj"],
         lora_dropout=0.1,
         bias="none",
         task_type="SEQ_CLS", 
