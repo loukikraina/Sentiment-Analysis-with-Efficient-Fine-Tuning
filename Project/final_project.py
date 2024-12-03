@@ -63,7 +63,6 @@ def print_trainable_params(model, stage_name="Model"):
 base_args = {
     "eval_strategy": "epoch",
     "save_strategy": "epoch",
-    "learning_rate": 2e-5,
     "per_device_train_batch_size": 16,
     "per_device_eval_batch_size": 16,
     "num_train_epochs": 3,
@@ -74,10 +73,11 @@ base_args = {
     "report_to": "none",
 }
 # To create dynamic result directory
-def create_training_args(output_dir):
+def create_training_args(output_dir, lr):
     return TrainingArguments(
         output_dir=output_dir,
         logging_dir=f"{output_dir}/logs",
+        learning_rate: lr,
         **base_args,
     )
 
@@ -135,7 +135,7 @@ def evaluate_model(model, training_args, name):
 
 
 # Step 2: Train or load the base model
-base_training_args = create_training_args(base_results_dir)
+base_training_args = create_training_args(output_dir=base_results_dir, lr=2e-5)
 
 if os.path.exists(BASE_MODEL_DIR):
     print("\nBase model already exists. Loading base model...")
@@ -161,7 +161,7 @@ else:
     print("\nBase model training completed.")
 
 # Step 3: Train or load the LoRA model
-lora_training_args = create_training_args(lora_results_dir)
+lora_training_args = create_training_args(output_dir=lora_results_dir, lr=1e-4)
 if os.path.exists(LORA_MODEL_DIR):
     print("\nLoRA model already exists. Loading LoRA model...")
     lora_model = AutoModelForSequenceClassification.from_pretrained(LORA_MODEL_DIR)
@@ -196,7 +196,7 @@ else:
     
     
 # Step 4: Train or load the Adapter model
-adapter_training_args = create_training_args(adapter_results_dir)
+adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=1e-3)
 if os.path.exists(ADAPTER_MODEL_DIR):
     print("\nAdapter model already exists. Loading Adapter model...")
     adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
