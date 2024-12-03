@@ -14,8 +14,17 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
-from adapters import AdapterConfig, BnConfig
 from pathlib import Path
+
+from transformers.models.roberta.modeling_roberta import (
+    RobertaModel,
+    RobertaEncoder,
+    RobertaLayer,
+    RobertaEmbeddings,
+    RobertaConfig,
+)
+
+from custom_Roberta import CustomRobertaModel, initialize_weights
 
 
 # Define model directories
@@ -45,27 +54,10 @@ def print_trainable_params(model, stage_name="Model"):
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total Parameters: {total_params}")
     print(f"Trainable Parameters: {trainable_params}")
+    print(f"%\\age of trainable params: {(trainable_params/total_params) * 100}")
     for name, param in model.named_parameters():
         if param.requires_grad:
             print(f"  - {name}: {param.numel()} params")
-
-# # Prepare training arguments
-# training_args = TrainingArguments(
-#     output_dir="./results",
-#     evaluation_strategy="epoch",  # Evaluate periodically during training
-#     #eval_steps=100,               # Frequency of evaluation (adjust as needed)
-#     save_strategy="epoch",
-#     learning_rate=2e-5,
-#     per_device_train_batch_size=16,
-#     per_device_eval_batch_size=16,
-#     num_train_epochs=3,
-#     weight_decay=0.01,
-#     logging_dir="./logs",
-#     logging_steps=10,
-#     load_best_model_at_end=True,
-#     fp16=True,  # Enable mixed precision training for GPU
-#     report_to="none",  # Disable reporting to avoid unnecessary overhead
-# )
 
 # Base TrainingArguments configuration
 base_args = {
@@ -207,13 +199,19 @@ else:
 adapter_training_args = create_training_args(adapter_results_dir)
 if os.path.exists(ADAPTER_MODEL_DIR):
     print("\nAdapter model already exists. Loading Adapter model...")
-    adapter_model = AutoModelForSequenceClassification.from_pretrained(ADAPTER_MODEL_DIR)
+    adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
 else:
     print("\nTraining Adapter Model...")
-    adapter_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-    adapter_config = BnConfig(mh_adapter=True, output_adapter=True, reduction_factor=16, non_linearity="relu")
-    adapter_model.add_adapter("imdb_adapter", config=adapter_config)
-    adapter_model.train_adapter(["imdb_adapter"])
+    config = RobertaConfig.from_pretrained(model_name, num_labels=2)
+
+    # Create the custom model
+    adapter_model = CustomRobertaModel(config)
+
+    # Load pretrained weights
+    pretrained_model = RobertaModel.from_pretrained(model_name)
+    adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
+    adapter_model.apply(initialize_weights)
+    
     trainer_adapter = Trainer(
         model=adapter_model,
         args=adapter_training_args,
@@ -232,7 +230,8 @@ else:
 
 # Step 5: Evaluate all models
 print("\nEvaluating all models...")
-base_results = evaluate_model(base_model, base_training_args, "Base")
+base_results = evaluate_model(base_model, base_training_args, "Base"
+                              )
 lora_results = evaluate_model(lora_model, lora_training_args, "LoRA")
 adapter_results = evaluate_model(adapter_model, adapter_training_args, "Adapter")
 
