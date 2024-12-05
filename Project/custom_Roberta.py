@@ -13,7 +13,7 @@ class CustomRobertaLayer(RobertaLayer):
         super().__init__(config)
         self.down_layer = nn.Linear(config.hidden_size, config.hidden_size // 2)  # Down-projection
         self.up_layer = nn.Linear(config.hidden_size // 2, config.hidden_size)    # Up-projection
-        self.activation = nn.GELU()                                              # Activation function
+        self.activation = nn.ReLU()                                              # Activation function
         self.layer_norm = nn.LayerNorm(config.hidden_size)                       # LayerNorm after Up-projection
         # intializing all as new layers
         self.down_layer._is_new = True
@@ -81,7 +81,7 @@ class CustomRobertaModel(RobertaModel):
         # Add the classification head at the end
         self.classifier = nn.Sequential(
             nn.Linear(config.hidden_size, 1024),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Linear(1024, config.num_labels),
         )
         self.classifier._is_new = True
@@ -92,7 +92,7 @@ class CustomRobertaModel(RobertaModel):
     def freeze_pretrained_layers(self):
         # Freeze all layers except the classifier and custom layers
         for name, param in self.named_parameters():
-            if "classifier" in name or "down_layer" in name or "up_layer" in name or "layer_norm" in name or "attention" in name:
+            if "classifier" in name or "down_layer" in name or "up_layer" in name or "layer_norm" in name:
                 param.requires_grad = True
             else:
                 param.requires_grad = False
