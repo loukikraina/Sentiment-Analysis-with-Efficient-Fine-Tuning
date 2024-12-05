@@ -222,12 +222,10 @@ else:
     # Optimizer with layer-wise learning rate decay
     optimizer_grouped_parameters = [
         {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
-        {"params": [p for n, p in adapter_model.named_parameters() if any(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 5e-5},
+        {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 5e-5},
     ]
     
     optimizer = AdamW(optimizer_grouped_parameters)
-    for group in optimizer.param_groups:
-        print([id(p) for p in group["params"]])
     
     # Scheduler
     num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
