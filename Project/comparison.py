@@ -1,4 +1,4 @@
-from datasets import load_metric
+import evaluate
 from sklearn.metrics import confusion_matrix, classification_report
 import torch
 import matplotlib.pyplot as plt
@@ -19,8 +19,8 @@ def evaluate_model(trainer, model, name, test_dataset):
     preds = np.argmax(predictions, axis=1)
     
     # Compute additional metrics
-    accuracy_metric = load_metric("accuracy")
-    precision_recall_metric = load_metric("precision", "recall", "f1")
+    accuracy_metric = evaluate.load("accuracy")
+    precision_recall_metric = evaluate.load("precision", "recall", "f1")
 
     accuracy = accuracy_metric.compute(predictions=preds, references=labels)["accuracy"]
     precision_recall_f1 = precision_recall_metric.compute(predictions=preds, references=labels)
