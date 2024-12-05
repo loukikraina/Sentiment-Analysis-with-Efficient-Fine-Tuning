@@ -14,7 +14,6 @@ class CustomRobertaLayer(RobertaLayer):
         self.down_layer = nn.Linear(config.hidden_size, config.hidden_size // 2)  # Down-projection
         self.up_layer = nn.Linear(config.hidden_size // 2, config.hidden_size)    # Up-projection
         self.activation = nn.GELU()                                              # Activation function
-        self.dropout = nn.Dropout(p=0.1)
         self.layer_norm = nn.LayerNorm(config.hidden_size)                       # LayerNorm after Up-projection
         # intializing all as new layers
         self.down_layer._is_new = True
@@ -59,7 +58,6 @@ class CustomRobertaLayer(RobertaLayer):
 
         # Down-projection, activation, up-projection, and LayerNorm
         down_projected = self.activation(self.down_layer(layer_output))
-        down_projected = self.dropout(down_projected)
         up_projected = self.activation(self.up_layer(down_projected))
         norm_output = self.layer_norm(up_projected + layer_output)  # Residual connection
 
@@ -84,7 +82,6 @@ class CustomRobertaModel(RobertaModel):
         self.classifier = nn.Sequential(
             nn.Linear(config.hidden_size, 1024),
             nn.GELU(),
-            nn.Dropout(p=0.1),
             nn.Linear(1024, config.num_labels),
         )
         self.classifier._is_new = True

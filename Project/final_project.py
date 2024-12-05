@@ -25,6 +25,8 @@ from transformers.models.roberta.modeling_roberta import (
 )
 
 from custom_Roberta import CustomRobertaModel, initialize_weights
+from comparison import compare_models
+from logger import CSVLoggerCallback
 
 
 
@@ -156,7 +158,7 @@ else:
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3), CSVLoggerCallback("./logs/training_log_base.csv")],
     )
     print_trainable_params(base_model, stage_name="Base Model")
     base_model.to(device)
@@ -192,7 +194,7 @@ else:
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3), CSVLoggerCallback("./logs/training_log_lora.csv")],
     )
     print_trainable_params(lora_model, stage_name="LoRA Model")
     start_time = time.time()
@@ -221,16 +223,16 @@ else:
     adapter_model.apply(initialize_weights)
     
     # Optimizer with layer-wise learning rate decay
-    optimizer_grouped_parameters = [
-        {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
-        {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 2e-5},
-    ]
+    # optimizer_grouped_parameters = [
+    #     {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
+    #     {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 2e-5},
+    # ]
     
-    optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
+    # optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
     
-    # Scheduler
-    num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
-    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=100, num_training_steps=num_training_steps)
+    # # Scheduler
+    # num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
+    # scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=100, num_training_steps=num_training_steps)
 
     
     trainer_adapter = Trainer(
@@ -239,8 +241,7 @@ else:
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
-        optimizers=(optimizer, scheduler),
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3), CSVLoggerCallback("./logs/training_log_adapter.csv")],
     )
     
     print_trainable_params(adapter_model, stage_name="Adapter Model")
@@ -264,3 +265,8 @@ print("\nSummary of Results:")
 print("Base Model:", base_results)
 print("LoRA Model:", lora_results)
 print("Adapter Model:", adapter_results)
+
+training_args_list = [base_training_args, lora_training_args, adapter_training_args]
+
+# Calculating metrics here for overall comparison
+metrics = compare_models(base_model, lora_model, adapter_model, training_args_list, test_dataset, tokenizer=tokenizer)
