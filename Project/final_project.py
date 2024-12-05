@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import textwrap
 import torch
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from transformers import AdamW, AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments, get_scheduler, EarlyStoppingCallback
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
 from pathlib import Path
@@ -48,6 +48,9 @@ Path(adapter_results_dir).mkdir(parents=True, exist_ok=True)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f'Using Device: {device}')
 
+#Number of epochs for all models
+num_epochs = 5
+
 def print_trainable_params(model, stage_name="Model"):
     print(f"\nTrainable Parameters in {stage_name}:")
     total_params = sum(p.numel() for p in model.parameters())
@@ -65,12 +68,14 @@ base_args = {
     "save_strategy": "epoch",
     "per_device_train_batch_size": 16,
     "per_device_eval_batch_size": 16,
-    "num_train_epochs": 3,
+    "num_train_epochs": num_epochs,
     "weight_decay": 0.01,
     "logging_steps": 10,
     "load_best_model_at_end": True,
     "fp16": True,
     "report_to": "none",
+    "metric_for_best_model": "eval_loss",
+    "greater_is_better": False,
 }
 # To create dynamic result directory
 def create_training_args(output_dir, lr):
@@ -150,6 +155,7 @@ else:
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
     print_trainable_params(base_model, stage_name="Base Model")
     base_model.to(device)
@@ -185,6 +191,7 @@ else:
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
     print_trainable_params(lora_model, stage_name="LoRA Model")
     start_time = time.time()
@@ -212,13 +219,28 @@ else:
     adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
     adapter_model.apply(initialize_weights)
     
+    # Optimizer with layer-wise learning rate decay
+    optimizer_grouped_parameters = [
+        {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
+        {"params": [p for n, p in adapter_model.named_parameters() if any(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 5e-5},
+    ]
+    optimizer = AdamW(optimizer_grouped_parameters)
+    
+    # Scheduler
+    num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
+    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=100, num_training_steps=num_training_steps)
+
+    
     trainer_adapter = Trainer(
         model=adapter_model,
         args=adapter_training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
+        optimizers=(optimizer, scheduler),
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
+    
     print_trainable_params(adapter_model, stage_name="Adapter Model")
     start_time = time.time()
     trainer_adapter.train()
