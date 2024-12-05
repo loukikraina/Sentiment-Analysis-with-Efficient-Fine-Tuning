@@ -17,11 +17,7 @@ class CSVLoggerCallback(TrainerCallback):
             lr = logs.get("learning_rate", None)
 
             # Calculate the gradient norm
-            gradient_norm = 0.0
-            for param in model.parameters():
-                if param.grad is not None:
-                    gradient_norm += param.grad.norm().item() ** 2
-            gradient_norm = gradient_norm ** 0.5  # Take the square root to get the L2 norm
+            gradient_norm = logs.get("grad_norm", None)
 
             # Append to CSV
             if loss is not None:
