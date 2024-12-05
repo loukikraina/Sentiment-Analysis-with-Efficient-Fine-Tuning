@@ -204,26 +204,26 @@ else:
     
     
 # Step 4: Train or load the Adapter model
-adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=5e-5)
+adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=2e-5)
 if os.path.exists(ADAPTER_MODEL_DIR):
     print("\nAdapter model already exists. Loading Adapter model...")
     adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
 else:
     print("\nTraining Adapter Model...")
-    config = RobertaConfig.from_pretrained(BASE_MODEL_DIR, num_labels=2)
+    config = RobertaConfig.from_pretrained(model_name, num_labels=2)
 
     # Create the custom model
     adapter_model = CustomRobertaModel(config)
 
     # Load pretrained weights
-    pretrained_model = RobertaModel.from_pretrained(BASE_MODEL_DIR)
+    pretrained_model = RobertaModel.from_pretrained(model_name)
     adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
     adapter_model.apply(initialize_weights)
     
     # Optimizer with layer-wise learning rate decay
     optimizer_grouped_parameters = [
         {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
-        {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 5e-5},
+        {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 2e-5},
     ]
     
     optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
