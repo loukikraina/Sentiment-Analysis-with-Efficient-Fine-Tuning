@@ -57,7 +57,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f'Using Device: {device}')
 
 #Number of epochs for all models
-num_epochs = 5
+num_epochs = 7
 
 def print_trainable_params(model, stage_name="Model"):
     print(f"\nTrainable Parameters in {stage_name}:")
@@ -78,7 +78,7 @@ base_args = {
     "per_device_eval_batch_size": 16,
     "num_train_epochs": num_epochs,
     "weight_decay": 0.01,
-    "logging_steps": 10,
+    "logging_steps": 100,
     "load_best_model_at_end": True,
     "fp16": True,
     "report_to": "none",
