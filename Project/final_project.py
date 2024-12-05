@@ -27,6 +27,7 @@ from transformers.models.roberta.modeling_roberta import (
 from custom_Roberta import CustomRobertaModel, initialize_weights
 
 
+
 # Define model directories
 BASE_MODEL_DIR = "./base_model"
 LORA_MODEL_DIR = "./lora_model"
@@ -209,13 +210,13 @@ if os.path.exists(ADAPTER_MODEL_DIR):
     adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
 else:
     print("\nTraining Adapter Model...")
-    config = RobertaConfig.from_pretrained(model_name, num_labels=2)
+    config = RobertaConfig.from_pretrained(base_model, num_labels=2)
 
     # Create the custom model
     adapter_model = CustomRobertaModel(config)
 
     # Load pretrained weights
-    pretrained_model = RobertaModel.from_pretrained(model_name)
+    pretrained_model = RobertaModel.from_pretrained(base_model)
     adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
     adapter_model.apply(initialize_weights)
     
@@ -225,7 +226,7 @@ else:
         {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 5e-5},
     ]
     
-    optimizer = AdamW(optimizer_grouped_parameters)
+    optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
     
     # Scheduler
     num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
