@@ -203,7 +203,7 @@ else:
     
     
 # Step 4: Train or load the Adapter model
-adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=1e-3)
+adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=5e-5)
 if os.path.exists(ADAPTER_MODEL_DIR):
     print("\nAdapter model already exists. Loading Adapter model...")
     adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
