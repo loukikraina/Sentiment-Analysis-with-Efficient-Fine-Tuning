@@ -210,13 +210,13 @@ if os.path.exists(ADAPTER_MODEL_DIR):
     adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
 else:
     print("\nTraining Adapter Model...")
-    config = RobertaConfig.from_pretrained(base_model, num_labels=2)
+    config = RobertaConfig.from_pretrained(BASE_MODEL_DIR, num_labels=2)
 
     # Create the custom model
     adapter_model = CustomRobertaModel(config)
 
     # Load pretrained weights
-    pretrained_model = RobertaModel.from_pretrained(base_model)
+    pretrained_model = RobertaModel.from_pretrained(BASE_MODEL_DIR)
     adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
     adapter_model.apply(initialize_weights)
     
