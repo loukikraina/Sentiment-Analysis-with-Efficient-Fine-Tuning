@@ -10,6 +10,7 @@ from typing import Optional, List, Tuple
 import matplotlib.pyplot as plt
 import textwrap
 import torch
+import json
 
 from transformers import AdamW, AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments, get_scheduler, EarlyStoppingCallback
 from datasets import load_dataset
@@ -35,6 +36,10 @@ BASE_MODEL_DIR = "./base_model"
 LORA_MODEL_DIR = "./lora_model"
 ADAPTER_MODEL_DIR = "./adapter_model"
 
+# base train output dir
+TRAIN_OUTPUT_DIR = "./train_output"
+def output_file_name(model_name):
+    return f'{TRAIN_OUTPUT_DIR}/training_results_{model_name}.json'
 # Base directory names
 from datetime import datetime
 
@@ -163,10 +168,13 @@ else:
     print_trainable_params(base_model, stage_name="Base Model")
     base_model.to(device)
     start_time = time.time()
-    trainer_base.train()
+    train_output = trainer_base.train()
     print(f"Base Model training time: {time.time() - start_time}s")
     base_model.save_pretrained(BASE_MODEL_DIR)
     tokenizer.save_pretrained(BASE_MODEL_DIR)
+    output_file = output_file_name('base')
+    with open(output_file, 'w') as f:
+        json.dump(train_output.metrics, f, indent=4)
     print("\nBase model training completed.")
 
 # Step 3: Train or load the LoRA model
@@ -198,10 +206,13 @@ else:
     )
     print_trainable_params(lora_model, stage_name="LoRA Model")
     start_time = time.time()
-    trainer_lora.train()
+    train_output = trainer_lora.train()
     print(f"LoRA model training time: {time.time() - start_time}s")
     lora_model.save_pretrained(LORA_MODEL_DIR)
     tokenizer.save_pretrained(LORA_MODEL_DIR)
+    output_file = output_file_name('lora')
+    with open(output_file, 'w') as f:
+        json.dump(train_output.metrics, f, indent=4)
     print("\nLoRA model training completed.")
     
     
@@ -246,10 +257,13 @@ else:
     
     print_trainable_params(adapter_model, stage_name="Adapter Model")
     start_time = time.time()
-    trainer_adapter.train()
+    train_output = trainer_adapter.train()
     print(f"Adapter model training time: {time.time() - start_time}s")
     adapter_model.save_pretrained(ADAPTER_MODEL_DIR)
     tokenizer.save_pretrained(ADAPTER_MODEL_DIR)
+    output_file = output_file_name('adapter')
+    with open(output_file, 'w') as f:
+        json.dump(train_output.metrics, f, indent=4)
     print("\nAdapter model training completed.")
 
 
