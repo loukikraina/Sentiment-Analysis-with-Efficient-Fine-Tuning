@@ -195,7 +195,8 @@ else:
         inference_mode=False,
     )
     # Apply LoRA to model
-    lora_model = get_peft_model(base_model, lora_config).to(device)
+    base_model_lora = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    lora_model = get_peft_model(base_model_lora, lora_config).to(device)
     trainer_lora = Trainer(
         model=lora_model,
         args=lora_training_args,
