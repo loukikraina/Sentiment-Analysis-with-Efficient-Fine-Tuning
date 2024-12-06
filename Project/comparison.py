@@ -10,7 +10,9 @@ def evaluate_model(trainer, model, name, test_dataset):
     """
     Evaluate the given model and compute various metrics.
     """
+    
     print(f"\nEvaluating {name} Model...")
+    
     # Standard evaluation using Trainer
     results = trainer.evaluate()
     
@@ -18,30 +20,38 @@ def evaluate_model(trainer, model, name, test_dataset):
     predictions, labels, _ = trainer.predict(test_dataset)
     preds = np.argmax(predictions, axis=1)
     
-    # Compute additional metrics
+    # Load individual metrics
     accuracy_metric = evaluate.load("accuracy")
-    precision_recall_metric = evaluate.load("precision", "recall", "f1")
-
+    precision_metric = evaluate.load("precision")
+    recall_metric = evaluate.load("recall")
+    f1_metric = evaluate.load("f1")
+    
+    # Compute metrics
     accuracy = accuracy_metric.compute(predictions=preds, references=labels)["accuracy"]
-    precision_recall_f1 = precision_recall_metric.compute(predictions=preds, references=labels)
+    precision = precision_metric.compute(predictions=preds, references=labels, average="weighted")["precision"]
+    recall = recall_metric.compute(predictions=preds, references=labels, average="weighted")["recall"]
+    f1 = f1_metric.compute(predictions=preds, references=labels, average="weighted")["f1"]
+    
+    # Compute confusion matrix
     confusion_mat = confusion_matrix(labels, preds)
     
+    # Print metrics
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Precision: {precision_recall_f1['precision']:.4f}")
-    print(f"Recall: {precision_recall_f1['recall']:.4f}")
-    print(f"F1-Score: {precision_recall_f1['f1']:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1-Score: {f1:.4f}")
     print("\nConfusion Matrix:\n", confusion_mat)
     
     # Visualize confusion matrix
     visualize_confusion_matrix(confusion_mat, name)
     
-    # Add results to a dictionary
+   # Add results to a dictionary
     metrics = {
         "eval_loss": results["eval_loss"],
         "accuracy": accuracy,
-        "precision": precision_recall_f1["precision"],
-        "recall": precision_recall_f1["recall"],
-        "f1_score": precision_recall_f1["f1"],
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1,
         "confusion_matrix": confusion_mat
     }
     
@@ -119,5 +129,4 @@ def compare_models(base_model, lora_model, adapter_model, training_args_list, te
         print()  # Blank line for readability
     
     return metrics_summary
-
 

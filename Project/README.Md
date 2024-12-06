@@ -68,27 +68,18 @@ The IMDB dataset is used for training and evaluation. The dataset consists of 50
 
 ## Training
 
-To train the models, you can run the following commands for each model:
+To train the models, you can run the following command (it will train all the models, if for any model saved model is already present then it will load the model instead of training it):
 
-1. **Training RoBERTa-large (Baseline)**:
+**Training RoBERTa-large (Baseline)** -> **Training LoRA** -> **Training Adapter-based Model**:
     ```bash
-    python train_roberta.py
+    python final_project.py
     ```
 
-2. **Training LoRA**:
-    ```bash
-    python train_lora.py
-    ```
-
-3. **Training Adapter-based Model**:
-    ```bash
-    python train_adapter.py
-    ```
 
 ### Hyperparameters:
 - Learning rate: `2e-5`
 - Batch size: `16`
-- Epochs: `7`
+- Epochs: `5`
 - Optimizer: `AdamW` with linear decay scheduler.
 
 ## Evaluation
@@ -97,7 +88,7 @@ The models are evaluated on the test set using the following metrics:
 - Accuracy
 - F1-score
 
-After training, evaluation metrics are saved in CSV files (`model_name_training_log.csv`).
+After training, evaluation metrics are saved in CSV files (`training_log_model_name.csv`).
 
 ## Visualization
 
@@ -147,16 +138,25 @@ This code loads CSV logs for all three models and plots their loss and gradient 
 After training, the following results were observed on the test set:
 
 ### RoBERTa-large (Baseline):
-- Accuracy: 94%
-- F1 Score: 93.8%
+– Evaluation Loss: 0.3046
+– Accuracy: 91.54%
+– Precision: 91.60%
+– Recall: 91.54%
+– F1-Score: 91.54%
 
 ### LoRA:
-- Accuracy: 93.5%
-- F1 Score: 93.2%
+– Evaluation Loss: 0.1853
+– Accuracy: 92.91%
+– Precision: 92.91%
+– Recall: 92.91%
+– F1-Score: 92.91%
 
 ### Adapter-based Fine-Tuning:
-- Accuracy: 92.8%
-- F1 Score: 92.4%
+– Evaluation Loss: 0.3764
+– Accuracy: 84.54%
+– Precision: 84.58%
+– Recall: 84.54%
+– F1-Score: 84.53%
 
 ### Observations:
 - The baseline model performed slightly better than LoRA and adapter-based models, but LoRA and adapters required significantly fewer trainable parameters and computational resources.
@@ -164,10 +164,6 @@ After training, the following results were observed on the test set:
 ## Acknowledgements
 
 This report used AI tools like ChatGPT for generating LaTeX structure and formatting suggestions. All content was written and edited manually, with modifications made to align the project with specific requirements.
-
-## File Structure
-
-. ├── data/ │ └── imdb_data.csv # IMDB dataset (if used locally) ├── logs/ │ ├── training_log_model_1.csv # Logs for model 1 (RoBERTa) │ ├── training_log_model_2.csv # Logs for model 2 (LoRA) │ └── training_log_model_3.csv # Logs for model 3 (Adapter-based) ├── src/ │ ├── train_roberta.py # RoBERTa training script │ ├── train_lora.py # LoRA training script │ └── train_adapter.py # Adapter training script ├── README.md └── requirements.txt # List of dependencies
 
 
 ## Requirements

@@ -28,6 +28,7 @@ from transformers.models.roberta.modeling_roberta import (
 from custom_Roberta import CustomRobertaModel, initialize_weights
 from comparison import compare_models
 from logger import CSVLoggerCallback
+from error_logger import log_errors, get_predictions
 
 
 
@@ -218,10 +219,22 @@ else:
     
     
 # Step 4: Train or load the Adapter model
+from safetensors.torch import load_file
+
 adapter_training_args = create_training_args(output_dir=adapter_results_dir, lr=2e-5)
 if os.path.exists(ADAPTER_MODEL_DIR):
     print("\nAdapter model already exists. Loading Adapter model...")
-    adapter_model = RobertaModel.from_pretrained(ADAPTER_MODEL_DIR)
+    # Load configuration
+    model_path = os.path.join(ADAPTER_MODEL_DIR, "model.safetensors")
+    weights = load_file(model_path)
+
+    config = RobertaConfig.from_pretrained(ADAPTER_MODEL_DIR)
+    
+    # Load custom model with saved configuration
+    adapter_model = CustomRobertaModel(config)
+    
+    # Load model weights
+    adapter_model.load_state_dict(weights, strict=False)
 else:
     print("\nTraining Adapter Model...")
     config = RobertaConfig.from_pretrained(model_name, num_labels=2)
@@ -233,18 +246,6 @@ else:
     pretrained_model = RobertaModel.from_pretrained(model_name)
     adapter_model.load_state_dict(pretrained_model.state_dict(), strict=False)
     adapter_model.apply(initialize_weights)
-    
-    # Optimizer with layer-wise learning rate decay
-    # optimizer_grouped_parameters = [
-    #     {"params": [p for n, p in adapter_model.named_parameters() if any(keyword in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 1e-4},
-    #     {"params": [p for n, p in adapter_model.named_parameters() if all(keyword not in n for keyword in ["classifier", "down_layer", "up_layer", "layer_norm",])], "lr": 2e-5},
-    # ]
-    
-    # optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
-    
-    # # Scheduler
-    # num_training_steps = len(train_dataset) // 16 * num_epochs  # Example for 3 epochs
-    # scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=100, num_training_steps=num_training_steps)
 
     
     trainer_adapter = Trainer(
@@ -285,3 +286,30 @@ training_args_list = [base_training_args, lora_training_args, adapter_training_a
 
 # Calculating metrics here for overall comparison
 metrics = compare_models(base_model, lora_model, adapter_model, training_args_list, test_dataset, tokenizer=tokenizer)
+
+
+
+tokenized_test_dataset = test_dataset.remove_columns(["text"])  # Remove raw text column if present
+tokenized_test_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "label"])
+
+    
+# Generate predictions
+texts, true_labels, predicted_labels = get_predictions(base_model, tokenizer=tokenizer, tokenized_test_dataset=tokenized_test_dataset, device=device, name="base_model")
+
+# Log errors
+log_errors(texts, true_labels, predicted_labels, output_file="base_model_errors.csv")
+
+
+# For Lora:
+# Generate predictions
+texts, true_labels, predicted_labels = get_predictions(lora_model, tokenizer=tokenizer, tokenized_test_dataset=tokenized_test_dataset, device=device, name='lora_model')
+
+# Log errors
+log_errors(texts, true_labels, predicted_labels, output_file="lora_model_errors.csv")
+
+# For Adapter
+# Generate predictions
+texts, true_labels, predicted_labels = get_predictions(adapter_model, tokenizer=tokenizer, tokenized_test_dataset=tokenized_test_dataset, device=device, name= 'adapter_model')
+
+# Log errors
+log_errors(texts, true_labels, predicted_labels, output_file="adapter_model_errors.csv")
