@@ -62,7 +62,7 @@ This project aims to explore and evaluate three techniques for fine-tuning pretr
 The IMDB dataset is used for training and evaluation. The dataset consists of 50,000 movie reviews, each labeled as either positive or negative. The dataset was split into an 80% training set and a 20% test set.
 
 ### Dataset Properties
-- Total reviews: 50,000 (25,000 positive, 25,000 negative).
+- Total reviews: 50,000 (25,000 train, 25,000 test).
 - Average review length: 230 tokens.
 - Preprocessing: Tokenization, truncation to 128 tokens, and padding.
 
